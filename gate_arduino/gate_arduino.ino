@@ -6,23 +6,34 @@ int motorClose = 12; // schematic pin 18
 
 int gateOpenedSensorPin = 7; // schematic pin 12
 int gateClosedSensorPin = 6; // schematic pin 13
+int overloadDetectionPin = 0; // schematic pin 2
 
-int previousState = 0;
+int dataOutputPin = 18; // Schematic pin 27 used to send data back to Home Controller
+
+int MOTOR_STOP_DELAY = 5000;
+int OPEN_STATE = 1;
+int CLOSE_STATE = 0;
+int RELAX_STATE = 2;
+int previousState = RELAX_STATE;
 
 
 void setup() {
-  // initialize digital pin LED_BUILTIN as an output.
-//  Serial.begin(9600);
+
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(motorOpen, OUTPUT);
   pinMode(motorClose, OUTPUT);
+  pinMode(dataOutputPin, OUTPUT);
+  
   pinMode(openGateSignalPin, INPUT_PULLUP);
   pinMode(closeGateSignalPin, INPUT_PULLUP);
   pinMode(gateOpenedSensorPin, INPUT);
   pinMode(gateClosedSensorPin, INPUT);
+  pinMode(overloadDetectionPin, INPUT);
 
-  digitalWrite(motorOpen, HIGH);
-  digitalWrite(motorClose, HIGH);
+  digitalWrite(motorOpen, LOW);
+  digitalWrite(motorClose, LOW);
+  digitalWrite(dataOutputPin, LOW);
+  
   delay(10);
 }
 
@@ -36,20 +47,33 @@ void loop() {
   int isGateOpen = !digitalRead(gateOpenedSensorPin);
   int isGateClosed = !digitalRead(gateClosedSensorPin);
 
+  //detect if motor is stuck
+  int isMotorStuck = digitalRead(overloadDetectionPin);
+
+
+  if (isMotorStuck){
+    handleMotorStuck();
+    return;
+  }
+
+  //Signal HC that motor is not stuck, and its ready
+  handleMotorReady();
+  
   
   if(openGateButton && !isGateOpen && !closeGateButton){
      
       openGate();
+      previousState = OPEN_STATE;
   
   } else if(closeGateButton && !isGateClosed && !openGateButton){
   
       closeGate();
+      previousState = CLOSE_STATE;
   
   } else {
-
+    
       relaxGate();
-//      Serial.println("Both buttons high - relaxed - some connection is cut");
-  
+      previousState = RELAX_STATE;  
   }
 
   delay(5);
@@ -57,34 +81,45 @@ void loop() {
 }
 
 
+
+void relaxGate(){
+  digitalWrite(motorOpen, LOW);
+  digitalWrite(motorClose, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
+}
+
+
+
 void closeGate(){
-//    if (previousState == 0) {
-//      stopGate();
-//      delay(2000);
-//      previousState = 1;
-//    }
-    digitalWrite(motorOpen, LOW);
-    digitalWrite(motorClose, HIGH);
-//    Serial.println("Close button high - closing");
-    digitalWrite(LED_BUILTIN, LOW);
+  if(previousState != CLOSE_STATE){
+    relaxGate();
+    delay(MOTOR_STOP_DELAY);
+  } 
+  digitalWrite(motorOpen, HIGH);
+  digitalWrite(motorClose, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 
 void openGate(){
-//    if (previousState == 1) {
-//      stopGate();
-//      delay(2000);
-//      previousState = 0;
-//    }
-    digitalWrite(motorOpen, HIGH);
-    digitalWrite(motorClose, LOW);
-    digitalWrite(LED_BUILTIN, LOW);
-//    Serial.println("Open button high - opening");
+  if(previousState != OPEN_STATE){
+    relaxGate();
+    delay(MOTOR_STOP_DELAY);
+  } 
+  digitalWrite(motorOpen, LOW);
+  digitalWrite(motorClose, HIGH);
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 
-void relaxGate(){
-  digitalWrite(motorOpen, HIGH);
-  digitalWrite(motorClose, HIGH);
-  digitalWrite(LED_BUILTIN, LOW);
+
+void handleMotorStuck(){
+  relaxGate();
+  digitalWrite(dataOutputPin, HIGH);
+  delay(10000);
+}
+
+
+void handleMotorReady(){
+  digitalWrite(dataOutputPin, LOW);
 }
