@@ -1,5 +1,5 @@
-int openGateSignalPin = 14; // schematic pin 23
-int closeGateSignalPin = 15; // schematic pin 24
+int openGateSignalPin = 15; // schematic pin 23
+int closeGateSignalPin = 14; // schematic pin 24
 
 int motorOpen = 11; // schematic pin 17
 int motorClose = 12; // schematic pin 18
@@ -10,7 +10,7 @@ int overloadDetectionPin = 0; // schematic pin 2
 
 int dataOutputPin = 18; // Schematic pin 27 used to send data back to Home Controller
 
-int MOTOR_STOP_DELAY = 5000;
+int MOTOR_STOP_DELAY = 4000;
 int OPEN_STATE = 1;
 int CLOSE_STATE = 0;
 int RELAX_STATE = 2;
