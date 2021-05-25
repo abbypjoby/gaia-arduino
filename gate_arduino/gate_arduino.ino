@@ -1,3 +1,5 @@
+#include<avr/wdt.h>
+
 int openGateSignalPin = 15; // schematic pin 23
 int closeGateSignalPin = 14; // schematic pin 24
 
@@ -11,11 +13,14 @@ int overloadDetectionPin = 0; // schematic pin 2
 int dataOutputPin = 18; // Schematic pin 27 used to send data back to Home Controller
 
 int MOTOR_STOP_DELAY = 4000;
-int OPEN_STATE = 1;
-int CLOSE_STATE = 0;
-int RELAX_STATE = 2;
-int previousState = RELAX_STATE;
 
+enum STATE {
+  OPEN,
+  CLOSE,
+  RELAX
+};
+STATE state = RELAX;
+STATE previousState = RELAX;
 
 void setup() {
 
@@ -33,13 +38,45 @@ void setup() {
   digitalWrite(motorOpen, LOW);
   digitalWrite(motorClose, LOW);
   digitalWrite(dataOutputPin, LOW);
+
+  wdt_disable();  /* Disable the watchdog and wait for more than 2 seconds */
+  delay(3000);  /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+  wdt_enable(WDTO_8S);  /* Enable the watchdog with a timeout of 8 seconds */
   
-  delay(10);
+  delay(100);
 }
 
-// the loop function runs over and over again forever
+
 void loop() {
-  
+  performIO();
+  switch(state) {
+    case OPEN: 
+      if(previousState != OPEN){
+        openGate();
+        previousState = OPEN;
+      }
+      break;
+
+    case CLOSE: 
+      if(previousState != CLOSE){
+        closeGate();
+        previousState = CLOSE;
+      }
+      break;
+
+    case RELAX: 
+      if(previousState != RELAX){
+        relaxGate();
+        previousState = RELAX;
+      }
+      break;
+  }
+  delay(50);
+  wdt_reset();
+}
+
+
+void performIO() {
   int openGateButton = digitalRead(openGateSignalPin);
   int closeGateButton = digitalRead(closeGateSignalPin);
 
@@ -49,35 +86,14 @@ void loop() {
 
   //detect if motor is stuck
   int isMotorStuck = digitalRead(overloadDetectionPin);
-
-
-  if (isMotorStuck){
-    handleMotorStuck();
-    return;
-  }
-
-  //Signal HC that motor is not stuck, and its ready
-  handleMotorReady();
-  
   
   if(openGateButton && !isGateOpen && !closeGateButton){
-     
-      openGate();
-      previousState = OPEN_STATE;
-  
+      state = OPEN;
   } else if(closeGateButton && !isGateClosed && !openGateButton){
-  
-      closeGate();
-      previousState = CLOSE_STATE;
-  
+      state = CLOSE;
   } else {
-    
-      relaxGate();
-      previousState = RELAX_STATE;  
+      state = RELAX;
   }
-
-  delay(5);
-
 }
 
 
@@ -91,10 +107,8 @@ void relaxGate(){
 
 
 void closeGate(){
-  if(previousState != CLOSE_STATE){
-    relaxGate();
-    delay(MOTOR_STOP_DELAY);
-  } 
+  relaxGate();
+  delay(MOTOR_STOP_DELAY);
   digitalWrite(motorOpen, HIGH);
   digitalWrite(motorClose, LOW);
   digitalWrite(LED_BUILTIN, LOW);
@@ -102,10 +116,8 @@ void closeGate(){
 
 
 void openGate(){
-  if(previousState != OPEN_STATE){
-    relaxGate();
-    delay(MOTOR_STOP_DELAY);
-  } 
+  relaxGate();
+  delay(MOTOR_STOP_DELAY);
   digitalWrite(motorOpen, LOW);
   digitalWrite(motorClose, HIGH);
   digitalWrite(LED_BUILTIN, LOW);
@@ -113,13 +125,13 @@ void openGate(){
 
 
 
-void handleMotorStuck(){
-  relaxGate();
-  digitalWrite(dataOutputPin, HIGH);
-  delay(10000);
-}
-
-
-void handleMotorReady(){
-  digitalWrite(dataOutputPin, LOW);
-}
+//void handleMotorStuck(){
+//  relaxGate();
+//  digitalWrite(dataOutputPin, HIGH);
+//  delay(10000);
+//}
+//
+//
+//void handleMotorReady(){
+//  digitalWrite(dataOutputPin, LOW);
+//}
